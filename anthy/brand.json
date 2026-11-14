@@ -1,18 +1,18 @@
 {
-    "app_name": "AnThyRemote",
-    "display_name": "AnThy Remote",
-    "company": "Cong Ty TNHH Cong Nghe An Thy Tech",
-    "company_display": "Công ty TNHH Công Nghệ An Thy Tech",
-    "tax_code": "5801528898",
-    "hotline": "0971.095.996",
-    "website": "anthytech.vn",
-    "server": "103.90.225.163",
-    "key": "UR9XGDa5SVfpYkonaR1revMRE7Aa2StwcpeOR0Mj6Pc=",
-    "android_id": "vn.anthytech.remote",
-    "languages": [
-          "vi",
-          "en",
-          "zh-cn",
-          "ko"
-    ]
+  "app_name": "AnThyRemote",
+  "display_name": "AnThy Remote",
+  "company": "Cong Ty TNHH Cong Nghe An Thy Tech",
+  "company_display": "Công ty TNHH Công Nghệ An Thy Tech",
+  "tax_code": "5801528898",
+  "hotline": "0971.095.996",
+  "website": "anthytech.vn",
+  "server": "103.90.225.163",
+  "key": "UR9XGDa5SVfpYkonaR1revMRE7Aa2StwcpeOR0Mj6Pc=",
+  "android_id": "vn.anthytech.remote",
+  "languages": [
+    "vi",
+    "en",
+    "zh-cn",
+    "ko"
+  ]
 }
