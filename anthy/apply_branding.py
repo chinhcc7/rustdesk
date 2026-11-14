@@ -4,9 +4,9 @@
 Run from the repository root (after `git checkout` with submodules):
     python3 anthy/apply_branding.py
 
-Reads anthy/brand.json. Fails loudly if an expected string is not found,
-so an upstream change never silently produces an un-branded build.
-"""
+    Reads anthy/brand.json. Fails loudly if an expected string is not found,
+    so an upstream change never silently produces an un-branded build.
+    """
 import json
 import os
 import re
@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(HERE, "assets")
 
 with open(os.path.join(HERE, "brand.json"), encoding="utf-8") as f:
-    B = json.load(f)
+        B = json.load(f)
 
 APP = B["app_name"]
 DISPLAY = B["display_name"]
@@ -26,112 +26,184 @@ COMPANY = B["company"]
 SERVER = B["server"].strip()
 KEY = B["key"].strip()
 ANDROID_ID = B["android_id"].strip()
+LANGS = [x.strip() for x in B.get("languages", [])]
 
 errors = []
 
 if not re.fullmatch(r"[A-Za-z0-9-]+", APP):
-    errors.append(f"app_name '{APP}' chi duoc dung chu, so va dau '-' (khong dau cach)")
-if not SERVER:
-    errors.append("brand.json: 'server' dang trong")
-if not KEY:
-    errors.append("brand.json: 'key' dang trong - hay dan public key cua server (id_ed25519.pub)")
-if errors:
-    for e in errors:
-        print("LOI:", e)
-    sys.exit(1)
+        errors.append(f"app_name '{APP}' chi duoc dung chu, so va dau '-' (khong dau cach)")
+    if not SERVER:
+            errors.append("brand.json: 'server' dang trong")
+        if not KEY:
+                errors.append("brand.json: 'key' dang trong - hay dan public key cua server (id_ed25519.pub)")
+            if errors:
+                    for e in errors:
+                                print("LOI:", e)
+                            sys.exit(1)
 
 
 def p(rel):
-    return os.path.join(ROOT, rel)
+        return os.path.join(ROOT, rel)
 
 
 def sub(rel, pairs, required=True):
-    path = p(rel)
+        path = p(rel)
     with open(path, encoding="utf-8") as f:
-        s = f.read()
+                s = f.read()
     orig = s
     for old, new in pairs:
-        if isinstance(old, re.Pattern):
-            s, n = old.subn(new, s)
-        else:
+                if isinstance(old, re.Pattern):
+                                s, n = old.subn(new, s)
+else:
             n = s.count(old)
             s = s.replace(old, new)
         if n == 0 and required:
-            errors.append(f"{rel}: khong tim thay '{old if isinstance(old, str) else old.pattern}'")
-    if s != orig:
-        with open(path, "w", encoding="utf-8", newline="") as f:
-            f.write(s)
-        print("patched", rel)
+                        errors.append(f"{rel}: khong tim thay '{old if isinstance(old, str) else old.pattern}'")
+                if s != orig:
+                            with open(path, "w", encoding="utf-8", newline="") as f:
+                                            f.write(s)
+                                        print("patched", rel)
 
 
 def copy(src, dst):
-    shutil.copyfile(os.path.join(ASSETS, src), p(dst))
+        shutil.copyfile(os.path.join(ASSETS, src), p(dst))
     print("copied ", dst)
 
 
 # 1. Core config: app name, ID/relay server, server public key
 sub("libs/hbb_common/src/config.rs", [
-    (re.compile(r'(APP_NAME: RwLock<String> = RwLock::new\(")RustDesk("\.to_owned\(\)\))'),
-     rf'\g<1>{APP}\g<2>'),
-    (re.compile(r'pub const RENDEZVOUS_SERVERS: &\[&str\] = &\[[^\]]*\];'),
-     f'pub const RENDEZVOUS_SERVERS: &[&str] = &["{SERVER}"];'),
-    (re.compile(r'pub const RS_PUB_KEY: &str = "[^"]*";'),
-     f'pub const RS_PUB_KEY: &str = "{KEY}";'),
+        (re.compile(r'(APP_NAME: RwLock<String> = RwLock::new\(")RustDesk("\.to_owned\(\)\))'),
+                   rf'\g<1>{APP}\g<2>'),
+        (re.compile(r'pub const RENDEZVOUS_SERVERS: &\[&str\] = &\[[^\]]*\];'),
+              f'pub const RENDEZVOUS_SERVERS: &[&str] = &["{SERVER}"];'),
+        (re.compile(r'pub const RS_PUB_KEY: &str = "[^"]*";'),
+              f'pub const RS_PUB_KEY: &str = "{KEY}";'),
 ])
 
 # 2. Windows executable metadata
 sub("flutter/windows/runner/Runner.rc", [
-    ('"Purslane Tech Pte. Ltd."', f'"{COMPANY}"'),
-    ('"RustDesk Remote Desktop"', f'"{DISPLAY}"'),
-    ('"ProductName", "RustDesk"', f'"ProductName", "{DISPLAY}"'),
-    (re.compile(r'"Copyright © \d+ Purslane Tech Pte\. Ltd\. All rights reserved\."'),
-     f'"Copyright (C) {COMPANY}"'),
+        ('"Purslane Tech Pte. Ltd."', f'"{COMPANY}"'),
+        ('"RustDesk Remote Desktop"', f'"{DISPLAY}"'),
+        ('"ProductName", "RustDesk"', f'"ProductName", "{DISPLAY}"'),
+        (re.compile(r'"Copyright © \d+ Purslane Tech Pte\. Ltd\. All rights reserved\."'),
+              f'"Copyright (C) {COMPANY}"'),
 ])
 sub("flutter/windows/runner/main.cpp", [('std::wstring app_name = L"RustDesk";',
-                                         f'std::wstring app_name = L"{APP}";')])
+                                                                                  f'std::wstring app_name = L"{APP}";')])
 sub("libs/portable/Cargo.toml", [
-    ('ProductName = "RustDesk"', f'ProductName = "{DISPLAY}"'),
-    ('FileDescription = "RustDesk Remote Desktop"', f'FileDescription = "{DISPLAY}"'),
-    (re.compile(r'LegalCopyright = "[^"]*"'), f'LegalCopyright = "Copyright (C) {COMPANY}"'),
+        ('ProductName = "RustDesk"', f'ProductName = "{DISPLAY}"'),
+        ('FileDescription = "RustDesk Remote Desktop"', f'FileDescription = "{DISPLAY}"'),
+        (re.compile(r'LegalCopyright = "[^"]*"'), f'LegalCopyright = "Copyright (C) {COMPANY}"'),
 ])
 sub("Cargo.toml", [
     ('ProductName = "RustDesk"', f'ProductName = "{DISPLAY}"'),
-    ('FileDescription = "RustDesk Remote Desktop"', f'FileDescription = "{DISPLAY}"'),
-    (re.compile(r'LegalCopyright = "[^"]*"'), f'LegalCopyright = "Copyright (C) {COMPANY}"'),
+        ('FileDescription = "RustDesk Remote Desktop"', f'FileDescription = "{DISPLAY}"'),
+        (re.compile(r'LegalCopyright = "[^"]*"'), f'LegalCopyright = "Copyright (C) {COMPANY}"'),
 ], required=False)
 
 # 3. Icons / logos (desktop)
 for src, dst in [
-    ("icon.png", "res/icon.png"),
-    ("32.png", "res/32x32.png"),
-    ("64.png", "res/64x64.png"),
-    ("128.png", "res/128x128.png"),
-    ("256.png", "res/128x128@2x.png"),
-    ("icon.ico", "res/icon.ico"),
-    ("tray-icon.ico", "res/tray-icon.ico"),
-    ("icon.ico", "flutter/windows/runner/resources/app_icon.ico"),
-    ("icon.png", "flutter/assets/icon.png"),
-    ("logo.png", "flutter/assets/logo.png"),
-    ("logo.png", "flutter/assets/logo_light.png"),
-    ("logo_dark.png", "flutter/assets/logo_dark.png"),
+        ("icon.png", "res/icon.png"),
+        ("32.png", "res/32x32.png"),
+        ("64.png", "res/64x64.png"),
+        ("128.png", "res/128x128.png"),
+        ("256.png", "res/128x128@2x.png"),
+        ("icon.ico", "res/icon.ico"),
+        ("tray-icon.ico", "res/tray-icon.ico"),
+        ("icon.ico", "flutter/windows/runner/resources/app_icon.ico"),
+        ("icon.png", "flutter/assets/icon.png"),
+        ("logo.png", "flutter/assets/logo.png"),
+        ("logo.png", "flutter/assets/logo_light.png"),
+        ("logo_dark.png", "flutter/assets/logo_dark.png"),
 ]:
-    copy(src, dst)
+        copy(src, dst)
 
 # 4. Android
 sub("flutter/android/app/src/main/res/values/strings.xml",
-    [('<string name="app_name">RustDesk</string>', f'<string name="app_name">{DISPLAY}</string>')])
+        [('<string name="app_name">RustDesk</string>', f'<string name="app_name">{DISPLAY}</string>')])
 sub("flutter/android/app/src/main/AndroidManifest.xml", [
-    ('android:label="RustDesk"', f'android:label="{DISPLAY}"'),
-    ('android:label="RustDesk Input"', f'android:label="{DISPLAY} Input"'),
+        ('android:label="RustDesk"', f'android:label="{DISPLAY}"'),
+        ('android:label="RustDesk Input"', f'android:label="{DISPLAY} Input"'),
 ])
 sub("flutter/android/app/build.gradle",
-    [('applicationId "com.carriez.flutter_hbb"', f'applicationId "{ANDROID_ID}"')])
+        [('applicationId "com.carriez.flutter_hbb"', f'applicationId "{ANDROID_ID}"')])
 for d in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
-    for n in ("ic_launcher", "ic_launcher_round", "ic_launcher_foreground", "ic_stat_logo"):
-        copy(f"android/mipmap-{d}/{n}.png",
-             f"flutter/android/app/src/main/res/mipmap-{d}/{n}.png")
+        for n in ("ic_launcher", "ic_launcher_round", "ic_launcher_foreground", "ic_stat_logo"):
+                    copy(f"android/mipmap-{d}/{n}.png",
+                                      f"flutter/android/app/src/main/res/mipmap-{d}/{n}.png")
+
+# 5. Language list: only keep the languages listed in brand.json "languages"
+if LANGS:
+        path = p("src/lang.rs")
+    with open(path, encoding="utf-8") as f:
+                s = f.read()
+    m = re.search(r'pub const LANGS: &\[\(&str, &str\)\] = &\[(.*?)\n\];', s, re.S)
+    if not m:
+                errors.append("src/lang.rs: khong tim thay danh sach LANGS")
+else:
+        avail = dict(re.findall(r'\("([^"]+)",\s*"([^"]+)"\)', m.group(1)))
+        missing = [c for c in LANGS if c not in avail]
+        if missing:
+                        errors.append(f"brand.json languages: ma ngon ngu khong ton tai {missing}")
+else:
+            body = "".join(f'\n    ("{c}", "{avail[c]}"),' for c in LANGS)
+            s = s[:m.start(1)] + body + s[m.end(1):]
+            with open(path, "w", encoding="utf-8", newline="") as f:
+                                f.write(s)
+                            print("patched src/lang.rs ->", ", ".join(LANGS))
+
+# 6. Language button next to the Settings button (desktop + Android)
+if B.get("language_button", True):
+        shutil.copyfile(os.path.join(HERE, "flutter", "anthy_lang_button.dart"),
+                                            p("flutter/lib/desktop/widgets/anthy_lang_button.dart"))
+    print("copied  flutter/lib/desktop/widgets/anthy_lang_button.dart")
+    sub("flutter/lib/desktop/pages/desktop_tab_page.dart", [
+                ("import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';",
+                          "import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';\n"
+                          "import 'package:flutter_hbb/desktop/widgets/anthy_lang_button.dart';"),
+                (re.compile(r"tail: Offstage\((.*?isClose: false,\s*\),)\s*\),", re.S),
+                          r"tail: Row(mainAxisSize: MainAxisSize.min, children: [const AnthyLangButton(), Offstage(\1)]),"),
+    ])
+    sub("flutter/lib/mobile/pages/home_page.dart", [
+                ("actions: _pages.elementAt(_selectedIndex).appBarActions,",
+                          "actions: [IconButton(icon: const Icon(Icons.translate), "
+                          "tooltip: translate('Language'), "
+                          "onPressed: () => showLanguageSettings(gFFI.dialogManager)), "
+                          "..._pages.elementAt(_selectedIndex).appBarActions],"),
+    ])
+
+# 7. Company name + hotline at the bottom of the main screen (desktop + Android)
+HOTLINE = B.get("hotline", "").strip()
+if HOTLINE:
+        def dart_str(v):
+                    return v.replace("\\", "\\\\").replace("'", "\\'").replace("$", "\\$")
+    with open(os.path.join(HERE, "flutter", "anthy_company_info.dart"), encoding="utf-8") as f:
+                src = f.read()
+    src = (src.replace("__COMPANY__", dart_str(B.get("company_display", COMPANY)))
+                         .replace("__HOTLINE__", dart_str(HOTLINE))
+                         .replace("__TAXCODE__", dart_str(B.get("tax_code", "").strip()))
+                         .replace("__WEBSITE__", dart_str(B.get("website", "").strip())))
+    with open(p("flutter/lib/common/widgets/anthy_company_info.dart"), "w",
+                            encoding="utf-8", newline="") as f:
+                                        f.write(src)
+                                    print("wrote   flutter/lib/common/widgets/anthy_company_info.dart")
+    sub("flutter/lib/desktop/pages/desktop_home_page.dart", [
+                ("import 'package:flutter_hbb/common.dart';",
+                          "import 'package:flutter_hbb/common.dart';\n"
+                          "import 'package:flutter_hbb/common/widgets/anthy_company_info.dart';"),
+                ("                Expanded(child: Container())\n",
+                          "                Expanded(child: Container()),\n"
+                          "                const AnthyCompanyInfo(),\n"),
+    ])
+    sub("flutter/lib/mobile/pages/home_page.dart", [
+                ("import 'package:flutter/material.dart';",
+                          "import 'package:flutter/material.dart';\n"
+                          "import 'package:flutter_hbb/common/widgets/anthy_company_info.dart';"),
+                ("body: _pages.elementAt(_selectedIndex),",
+                          "body: Column(children: [Expanded(child: _pages.elementAt(_selectedIndex)), const AnthyCompanyInfo()]),"),
+    ])
 
 if errors:
-    print("\n".join("LOI: " + e for e in errors))
+        print("\n".join("LOI: " + e for e in errors))
     sys.exit(1)
 print(f"\nOK - da gan thuong hieu {DISPLAY} ({APP}), server {SERVER}")
