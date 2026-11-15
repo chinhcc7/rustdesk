@@ -276,6 +276,14 @@ if HOTLINE:
             ("launchUrlString('https://rustdesk.com');", f"launchUrlString('{WEB_URL}');"),
         ])
 
+
+# 10. Status bar: replace "set up your own server" tip with hotline + website
+if HOTLINE and WEBSITE:
+    sub("flutter/lib/desktop/pages/connection_page.dart", [
+        ("onTap: onUsePublicServerGuide,", f"onTap: () => launchUrlString('{WEB_URL}'),"),
+        ("translate('setup_server_tip'),", f"'Hotline: {dart_str(HOTLINE)} · {dart_str(WEB_LABEL)}',"),
+    ])
+
 if errors:
     print("\n".join("LOI: " + e for e in errors))
     sys.exit(1)
