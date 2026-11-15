@@ -203,6 +203,19 @@ if HOTLINE:
          "body: Column(children: [Expanded(child: _pages.elementAt(_selectedIndex)), const AnthyCompanyInfo()]),"),
     ])
 
+
+# 8. Windows installer: rename the copied rustdesk.exe to <app_name>.exe on a fresh
+#    install too (upstream only renames on update, so shortcuts and the service
+#    would point at a missing <app_name>.exe)
+sub("src/platform/windows.rs", [
+    ('md \\"{path}\\"\n{copy_exe}\nreg add {subkey} /f\n',
+     'md \\"{path}\\"\n{copy_exe}\n{rename_exe}\nreg add {subkey} /f\n'),
+    ("        copy_exe = copy_exe_cmd(&src_exe, &exe, &path)?,\n"
+     "        import_config = get_import_config(&exe),\n",
+     "        copy_exe = copy_exe_cmd(&src_exe, &exe, &path)?,\n"
+     "        rename_exe = rename_exe_cmd(&src_exe, &path)?,\n"
+     "        import_config = get_import_config(&exe),\n"),
+])
 if errors:
     print("\n".join("LOI: " + e for e in errors))
     sys.exit(1)
