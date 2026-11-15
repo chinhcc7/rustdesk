@@ -216,6 +216,66 @@ sub("src/platform/windows.rs", [
      "        rename_exe = rename_exe_cmd(&src_exe, &path)?,\n"
      "        import_config = get_import_config(&exe),\n"),
 ])
+
+# 9. "Powered by" link + About page -> company info and website
+WEBSITE = B.get("website", "").strip()
+if WEBSITE:
+    WEB_URL = WEBSITE if WEBSITE.startswith("http") else "https://" + WEBSITE
+    WEB_LABEL = re.sub(r"^https?://", "", WEBSITE).rstrip("/")
+    # top-left "Powered by me" link on the desktop home page
+    sub("flutter/lib/common.dart", [
+        ("        launchUrl(Uri.parse('https://rustdesk.com'));\n      },\n      child: Opacity(",
+         f"        launchUrl(Uri.parse('{WEB_URL}'));\n      }},\n      child: Opacity("),
+        ('            translate("powered_by_me"),', f"            '{WEB_LABEL}',"),
+    ])
+    # Android: About section / dialog link
+    sub("flutter/lib/mobile/pages/settings_page.dart", [
+        ("'https://rustdesk.com/'", f"'{WEB_URL}'"),
+        ("Text('rustdesk.com',", f"Text('{WEB_LABEL}',"),
+    ])
+if HOTLINE:
+    # desktop Settings -> About: company info in the blue box, RustDesk credit kept small
+    sub("flutter/lib/desktop/pages/desktop_setting_page.dart", [
+        ("import 'package:flutter_hbb/common.dart';",
+         "import 'package:flutter_hbb/common.dart';\n"
+         "import 'package:flutter_hbb/common/widgets/anthy_company_info.dart';"),
+        ("""                          Text(
+                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\\n$license',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          Text(
+                            translate('Slogan_tip'),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white),
+                          )
+""",
+         """                          Text(
+                            kAnthyCompany,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white),
+                          ),
+                          Text(
+                            [
+                              if (kAnthyTaxCode.isNotEmpty) 'MST: $kAnthyTaxCode',
+                              'Hotline: $kAnthyHotline',
+                              if (kAnthyWebsite.isNotEmpty) 'Web: $kAnthyWebsite',
+                            ].join('\\n'),
+                            style: const TextStyle(color: Colors.white),
+                          ).marginOnly(top: 4),
+                          Text(
+                            'Based on RustDesk - Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\\n$license',
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 11),
+                          ).marginOnly(top: 10),
+"""),
+    ])
+    if WEBSITE:
+        sub("flutter/lib/desktop/pages/desktop_setting_page.dart", [
+            ("launchUrlString('https://rustdesk.com');", f"launchUrlString('{WEB_URL}');"),
+        ])
+
 if errors:
     print("\n".join("LOI: " + e for e in errors))
     sys.exit(1)
