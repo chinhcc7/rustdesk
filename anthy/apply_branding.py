@@ -284,6 +284,47 @@ if HOTLINE and WEBSITE:
         ("translate('setup_server_tip'),", f"'Hotline: {dart_str(HOTLINE)} · {dart_str(WEB_LABEL)}',"),
     ])
 
+
+# 11. Android: Accessibility prominent disclosure (Google Play User Data policy)
+#     + rename the "RustDesk Input" service name in the permission tips
+A11Y = {
+    "en": ("{app} uses the Android Accessibility service only to carry out the taps, swipes and key presses sent by the technician you allow to connect, so they can control this device remotely. When text is typed, it is entered into the field you have selected. {app} does not use Accessibility to collect, store or share your personal data or screen content. You can turn this permission off at any time in Settings.",
+           "Agree and open settings"),
+    "vi": ("{app} chỉ dùng dịch vụ Trợ năng (Accessibility) của Android để thực hiện các thao tác chạm, vuốt và gõ phím do kỹ thuật viên mà bạn cho phép kết nối gửi tới, giúp họ điều khiển thiết bị này từ xa. Khi gõ chữ, nội dung được nhập vào ô bạn đang chọn. {app} không dùng Trợ năng để thu thập, lưu trữ hay chia sẻ dữ liệu cá nhân hoặc nội dung màn hình của bạn. Bạn có thể tắt quyền này bất cứ lúc nào trong Cài đặt.",
+           "Đồng ý và mở Cài đặt"),
+    "cn": ("{app} 仅使用 Android 无障碍服务来执行您允许连接的技术人员发送的点按、滑动和按键操作，以便其远程控制本设备。输入文字时，内容会输入到您当前选中的输入框。{app} 不会使用无障碍服务收集、存储或分享您的个人数据或屏幕内容。您可以随时在设置中关闭此权限。",
+           "同意并打开设置"),
+    "ko": ("{app}은(는) 연결을 허용한 기술자가 보내는 탭, 스와이프, 키 입력을 실행하여 이 기기를 원격으로 제어할 수 있도록 Android 접근성 서비스만 사용합니다. 텍스트를 입력하면 선택한 입력란에 입력됩니다. {app}은(는) 접근성 서비스로 개인 정보나 화면 내용을 수집, 저장 또는 공유하지 않습니다. 설정에서 언제든지 이 권한을 끌 수 있습니다.",
+           "동의하고 설정 열기"),
+}
+for code, (text, agree) in A11Y.items():
+    rel = f"src/lang/{code}.rs"
+    if not os.path.exists(p(rel)):
+        continue
+    with open(p(rel), encoding="utf-8") as f:
+        s = f.read()
+    s = s.replace("[RustDesk Input]", f"[{DISPLAY} Input]").replace("[RustDesk 입력]", f"[{DISPLAY} Input]")
+    m = re.search(r'\n(\s*)\("android_input_permission_tip2",[^\n]*\n', s)
+    if not m:
+        errors.append(f"{rel}: khong tim thay android_input_permission_tip2")
+        continue
+    esc = lambda v: v.replace("\\", "\\\\").replace('"', '\\"')
+    add = (f'{m.group(1)}("anthy_a11y_disclosure", "{esc(text.format(app=DISPLAY))}"),\n'
+           f'{m.group(1)}("anthy_a11y_agree", "{esc(agree)}"),\n')
+    s = s[:m.end()] + add + s[m.end():]
+    with open(p(rel), "w", encoding="utf-8", newline="") as f:
+        f.write(s)
+    print("patched", rel, "(a11y disclosure)")
+
+sub("flutter/lib/models/server_model.dart", [
+    ('''          Text(translate("android_input_permission_tip1")),''',
+     '''          Text(translate("anthy_a11y_disclosure")),
+          const SizedBox(height: 10),
+          Text(translate("android_input_permission_tip1")),'''),
+    ('''        dialogButton("Open System Setting", onPressed: submit),''',
+     '''        dialogButton("anthy_a11y_agree", onPressed: submit),'''),
+])
+
 if errors:
     print("\n".join("LOI: " + e for e in errors))
     sys.exit(1)
