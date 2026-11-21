@@ -562,3 +562,134 @@ jobs:
           signed-apk/AnThyRemote-${{ env.VERSION }}-${{ matrix.job.arch }}.apk
 
         name: AnThy Remote (ban moi nhat)
+
+  # AnThy Remote: Google Play bundle (.aab, arm64 + armv7), signed with the fixed upload key.
+  # Runs only when the ANDROID_* secrets are set. Reuses the Rust libraries built above.
+  build-android-play:
+    needs: [generate-bridge, build-rustdesk-android]
+    name: build android app bundle for Google Play
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Check signing secrets
+      if: env.ANDROID_SIGNING_KEY == null
+      run: echo "::warning::Chua co secret ANDROID_SIGNING_KEY nen bo qua ban CH Play (.aab)."
+
+    - name: Free Disk Space (Ubuntu)
+      if: env.ANDROID_SIGNING_KEY != null
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be   # v1.3.1
+      with:
+        tool-cache: false
+        android: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        docker-images: true
+        swap-storage: false
+
+    - name: Install dependencies
+      if: env.ANDROID_SIGNING_KEY != null
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openjdk-17-jdk-headless
+
+    - name: Checkout source code
+      if: env.ANDROID_SIGNING_KEY != null
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5   # v4
+      with:
+        submodules: recursive
+
+    - name: Apply AnThy Remote branding
+      if: env.ANDROID_SIGNING_KEY != null
+      shell: bash
+      run: |
+        python3 anthy/apply_branding.py
+
+    - name: Install flutter
+      if: env.ANDROID_SIGNING_KEY != null
+      uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2   # v2
+      with:
+        channel: "stable"
+        flutter-version: ${{ env.ANDROID_FLUTTER_VERSION }}
+
+    - name: Patch flutter
+      if: env.ANDROID_SIGNING_KEY != null
+      run: |
+        cd $(dirname $(dirname $(which flutter)))
+        if [[ "3.24.5" == ${{env.ANDROID_FLUTTER_VERSION}} ]]; then
+          git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+        fi
+
+    - uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779   # v1
+      if: env.ANDROID_SIGNING_KEY != null
+      id: setup-ndk
+      with:
+        ndk-version: ${{ env.NDK_VERSION }}
+        add-to-path: true
+
+    - name: Restore bridge files
+      if: env.ANDROID_SIGNING_KEY != null
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c   # v8.0.1
+      with:
+        name: bridge-artifact
+        path: ./
+
+    - name: Download arm64 library
+      if: env.ANDROID_SIGNING_KEY != null
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c   # v8.0.1
+      with:
+        name: librustdesk.so.aarch64-linux-android
+        path: ./play-libs/arm64-v8a
+
+    - name: Download armv7 library
+      if: env.ANDROID_SIGNING_KEY != null
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c   # v8.0.1
+      with:
+        name: librustdesk.so.armv7-linux-androideabi
+        path: ./play-libs/armeabi-v7a
+
+    - name: Build app bundle
+      if: env.ANDROID_SIGNING_KEY != null
+      shell: bash
+      env:
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+        ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        KEY_B64: ${{ secrets.ANDROID_SIGNING_KEY }}
+        KEY_ALIAS: ${{ secrets.ANDROID_ALIAS }}
+        KEY_STORE_PASSWORD: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
+        KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      run: |
+        set -e
+        export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
+        sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx3g/g" ./flutter/android/gradle.properties
+        SYS=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib
+        J=./flutter/android/app/src/main/jniLibs
+        mkdir -p $J/arm64-v8a $J/armeabi-v7a
+        cp $SYS/aarch64-linux-android/libc++_shared.so $J/arm64-v8a/
+        cp $SYS/arm-linux-androideabi/libc++_shared.so $J/armeabi-v7a/
+        cp ./play-libs/arm64-v8a/liblibrustdesk.so $J/arm64-v8a/librustdesk.so
+        cp ./play-libs/armeabi-v7a/liblibrustdesk.so $J/armeabi-v7a/librustdesk.so
+        echo "$KEY_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+        cat > ./flutter/android/key.properties <<EOF
+        storeFile=$RUNNER_TEMP/upload.jks
+        storePassword=$KEY_STORE_PASSWORD
+        keyAlias=$KEY_ALIAS
+        keyPassword=$KEY_PASSWORD
+        EOF
+        sed -i 's/^ *//' ./flutter/android/key.properties
+        pushd flutter
+        flutter build appbundle --release --target-platform android-arm,android-arm64 --build-name ${{ env.VERSION }} --build-number $((1000 + ${{ github.run_number }}))
+        popd
+        mkdir -p play-out
+        cp flutter/build/app/outputs/bundle/release/app-release.aab play-out/AnThyRemote-${{ env.VERSION }}-googleplay.aab
+        rm -f ./flutter/android/key.properties "$RUNNER_TEMP/upload.jks"
+        ls -l play-out
+
+    - name: Publish app bundle
+      if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
+      uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844   # v1
+      with:
+        prerelease: true
+        tag_name: ${{ env.TAG_NAME }}
+        name: AnThy Remote (ban moi nhat)
+        files: |
+          play-out/AnThyRemote-${{ env.VERSION }}-googleplay.aab
